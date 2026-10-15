@@ -26,4 +26,24 @@ jobs:
             runtime: osx-arm64
 
     runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Compile Linux x64
+
+      - name: Compile Linux arm64
+
+      - name: Compile Windows x64
+
+      - name: Compile Windows arm64
+
+      - name: Compile MacOS x64
+
+      - name: Compile MacOS arm64
+
+      - name: Compile NugetPackage
+
+      - Name: Load up to Github: 
+
+      - Name: Load up to Nuget:
       
