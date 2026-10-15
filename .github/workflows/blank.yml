@@ -29,20 +29,87 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+      
       - name: Compile Linux x64
-
+        shell: pwsh
+        if: contains(matrix.runtime, 'linux-x64')
+        run: 
+        
       - name: Compile Linux arm64
-
+        shell: pwsh
+        if: contains(matrix.runtime, 'linux-arm64')
+        run: 
+        
       - name: Compile Windows x64
-
+        shell: pwsh
+        if: contains(matrix.runtime, 'win-x64')
+        uses: msys2/setup-msys2@v3
+        with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          base-devel
+          mingw-w64-x86_64-toolchain
+          mingw-w64-x86_64-python
+          mingw-w64-x86_64-ninja
+          mingw-w64-x86_64-glib2
+          mingw-w64-x86_64-pixman
+          mingw-w64-x86_64-libfdt
+          mingw-w64-x86_64-zstd
+          mingw-w64-x86_64-ntldd-git
+          git
+        run: |
+          # Download QEMU
+          git clone https://gitlab.com/qemu-project/qemu.git qemu-src
+          cd qemu-src
+          git checkout v9.2.0
+          
+          # Build
+          mkdir build && cd build
+          ../configure \
+            --target-list=x86_64-softmmu,aarch64-softmmu \
+            --prefix=/c/qemu-portable \
+            --disable-docs \
+            --disable-sdl \
+            --disable-gtk \
+            --disable-curses \
+            --without-default-features
+          ninja -j$(nproc)
+          ninja install
+          
+          # Gather portable files
+          mkdir -p /c/qemu-portable/bin
+          mkdir -p /c/qemu-portable/share/qemu
+          cp /c/qemu-portable/bin/qemu-system-*.exe /c/qemu-portable/bin/
+          cp -r /c/qemu-portable/share/qemu/* /c/qemu-portable/share/qemu/
+          
+          # Copy required DLLs
+          cd /c/qemu-portable/bin
+          DLLS=$(ntldd -R qemu-system-x86_64.exe | grep -i "mingw64" | awk '{print $3}')
+          for dll in $DLLS; do
+            cp "$dll" /c/qemu-portable/bin/
+          done
+          
+          # Strip binaries
+          strip *.exe *.dll
+        
       - name: Compile Windows arm64
-
+        shell: pwsh
+        if: contains(matrix.runtime, 'win-arm64')
+        run: 
+        
       - name: Compile MacOS x64
-
+        shell: pwsh
+        if: contains(matrix.runtime, 'osx-x64')
+        run: 
+        
       - name: Compile MacOS arm64
-
+        shell: pwsh
+        if: contains(matrix.runtime, 'osx-x64')
+        run: 
+        
       - name: Compile NugetPackage
-
+        
       - Name: Load up to Github: 
 
       - Name: Load up to Nuget:
