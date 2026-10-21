@@ -24,14 +24,14 @@ jobs:
             os: windows
             arch: x64
             msystem: MINGW64
-            prefix: mingw-w64-x86_64
+            prefix: mingw-w64-x86_64-
 
           - name: windows-arm64
             runner: windows-11-arm
             os: windows
             arch: arm64
             msystem: CLANGARM64
-            prefix: mingw-w64-clang-aarch64
+            prefix: mingw-w64-clang-aarch64-
 
           - name: macos-x64
             runner: macos-15-intel
@@ -39,7 +39,7 @@ jobs:
             arch: x64
 
           - name: macos-arm64
-            runner: macos-14
+            runner: macos-15
             os: macos
             arch: arm64
 
@@ -74,19 +74,17 @@ jobs:
           install: >-
             base-devel
             git
-            python
-            ninja
-            meson
             diffutils
             flex
             bison
-            grep
-            make
-            pkgconf
-            ${{ matrix.prefix }}-toolchain
-            ${{ matrix.prefix }}-glib2
-            ${{ matrix.prefix }}-pixman
-            ${{ matrix.prefix }}-zstd
+            ${{ matrix.prefix }}toolchain
+            ${{ matrix.prefix }}glib2
+            ${{ matrix.prefix }}pixman
+            ${{ matrix.prefix }}zstd
+            ${{ matrix.prefix }}ninja
+            ${{ matrix.prefix }}meson
+            ${{ matrix.prefix }}python
+            ${{ matrix.prefix }}pkgconf
 
       - name: Install Linux dependencies
         if: matrix.os == 'linux'
@@ -112,7 +110,6 @@ jobs:
       - name: Install macOS dependencies
         if: matrix.os == 'macos'
         run: |
-          brew update
           brew install meson ninja glib pixman pkgconf
 
       - name: Configure Windows
@@ -120,38 +117,50 @@ jobs:
         shell: msys2 {0}
         run: |
           mkdir -p build
-          ./configure \
-            --prefix="$PWD/build/install" \
+          cd build
+          ../configure \
+            --prefix=/usr \
             --target-list=x86_64-softmmu,aarch64-softmmu \
             --disable-werror
 
       - name: Configure macOS
         if: matrix.os == 'macos'
         run: |
-          ./configure \
-            --prefix="$PWD/build/install" \
+          mkdir -p build
+          cd build
+          ../configure \
+            --prefix=/usr/local \
             --target-list=x86_64-softmmu,aarch64-softmmu \
             --disable-werror
 
       - name: Configure Linux
         if: matrix.os == 'linux'
         run: |
-          ./configure \
-            --prefix="$PWD/build/install" \
+          mkdir -p build
+          cd build
+          ../configure \
+            --prefix=/usr \
             --target-list=x86_64-softmmu,aarch64-softmmu \
             --disable-werror
 
       - name: Build
         if: matrix.os != 'windows'
-        run: |
-          ninja -C build
-          DESTDIR="$PWD/stage" ninja -C build install
+        run: ninja -C build
 
       - name: Build Windows
         if: matrix.os == 'windows'
         shell: msys2 {0}
+        run: ninja -C build
+
+      - name: Stage Linux and macOS artifacts
+        if: matrix.os != 'windows'
         run: |
-          ninja -C build
+          DESTDIR="$PWD/stage" ninja -C build install
+
+      - name: Stage Windows artifacts
+        if: matrix.os == 'windows'
+        shell: msys2 {0}
+        run: |
           DESTDIR="$PWD/stage" ninja -C build install
 
       - name: Upload artifacts
