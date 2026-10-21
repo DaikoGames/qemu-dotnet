@@ -23,47 +23,62 @@ jobs:
             runner: windows-2022
             os: windows
             msystem: MINGW64
-            prefix: mingw-w64-x86_64
+            prefix: mingw-w64-x86_64-
 
           - name: windows-arm64
             runner: windows-11-arm
             os: windows
             msystem: CLANGARM64
-            prefix: mingw-w64-clang-aarch64
+            prefix: mingw-w64-clang-aarch64-
 
           - name: macos-x64
             runner: macos-15-intel
             os: macos
-            arch: x86_64
-            os_arch: x86_64
 
           - name: macos-arm64
             runner: macos-15
             os: macos
-            arch: aarch64
-            os_arch: arm64
 
           - name: linux-x64
             runner: ubuntu-24.04
             os: linux
-            arch: x86_64
 
           - name: linux-arm32
             runner: ubuntu-24.04
             os: linux
-            arch: arm32
 
           - name: linux-arm64
             runner: ubuntu-24.04-arm
             os: linux
-            arch: aarch64
 
     steps:
+      # Windows: enable long paths before checkout
+      - name: Enable Git long paths
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          git config --global core.longpaths true
+
+      # Checkout repository without recursively checking out submodules
       - name: Checkout QEMU
         uses: actions/checkout@v4
         with:
           repository: qemu/qemu
-          submodules: recursive
+          path: q
+          submodules: false
+          persist-credentials: false
+
+      # Initialize submodules with Git long paths enabled
+      - name: Checkout QEMU submodules
+        shell: pwsh
+        if: runner.os == 'Windows'
+        run: |
+          cd q
+          git -c core.longpaths=true submodule update --init --recursive
+
+      - name: Checkout QEMU submodules (Unix)
+        if: runner.os != 'Windows'
+        run: git -C q submodule update --init --recursive
 
       # Windows dependencies
       - name: Setup MSYS2
@@ -78,14 +93,14 @@ jobs:
             diffutils
             flex
             bison
-            ${{ matrix.prefix }}-toolchain
-            ${{ matrix.prefix }}-glib2
-            ${{ matrix.prefix }}-pixman
-            ${{ matrix.prefix }}-ninja
-            ${{ matrix.prefix }}-meson
-            ${{ matrix.prefix }}-python
-            ${{ matrix.prefix }}-pkgconf
-            ${{ matrix.prefix }}-zstd
+            ${{ matrix.prefix }}toolchain
+            ${{ matrix.prefix }}glib2
+            ${{ matrix.prefix }}pixman
+            ${{ matrix.prefix }}ninja
+            ${{ matrix.prefix }}meson
+            ${{ matrix.prefix }}python
+            ${{ matrix.prefix }}pkgconf
+            ${{ matrix.prefix }}zstd
 
       # Linux dependencies
       - name: Install Linux dependencies
@@ -115,28 +130,31 @@ jobs:
         run: |
           brew install meson ninja glib pixman pkgconf
 
-      # Windows configuration
+      # Configure Windows
       - name: Configure Windows
         if: matrix.os == 'windows'
         shell: msys2 {0}
+        working-directory: q
         run: |
           ./configure \
             --prefix=/usr \
             --target-list=x86_64-softmmu,aarch64-softmmu \
             --disable-werror
 
-      # macOS configuration
+      # Configure macOS
       - name: Configure macOS
         if: matrix.os == 'macos'
+        working-directory: q
         run: |
           ./configure \
             --prefix=/usr/local \
             --target-list=x86_64-softmmu,aarch64-softmmu \
             --disable-werror
 
-      # Linux configuration
+      # Configure Linux
       - name: Configure Linux
         if: matrix.os == 'linux'
+        working-directory: q
         run: |
           ./configure \
             --prefix=/usr \
@@ -147,24 +165,28 @@ jobs:
       - name: Build Windows
         if: matrix.os == 'windows'
         shell: msys2 {0}
+        working-directory: q
         run: ninja -C build
 
       # Build macOS and Linux
       - name: Build Unix
         if: matrix.os != 'windows'
+        working-directory: q
         run: ninja -C build
 
-      # Stage Windows artifacts
+      # Install Windows
       - name: Install Windows
         if: matrix.os == 'windows'
         shell: msys2 {0}
+        working-directory: q
         run: |
           mkdir -p stage
           DESTDIR="$PWD/stage" ninja -C build install
 
-      # Stage macOS and Linux artifacts
+      # Install macOS and Linux
       - name: Install Unix
         if: matrix.os != 'windows'
+        working-directory: q
         run: |
           mkdir -p stage
           DESTDIR="$PWD/stage" ninja -C build install
@@ -174,6 +196,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: qemu-${{ matrix.name }}
-          path: stage/
+          path: q/stage/
           if-no-files-found: error
           compression-level: 6
